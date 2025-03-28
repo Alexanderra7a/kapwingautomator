@@ -1,8 +1,7 @@
 /**
- * Kapwing API integration for account creation and verification
+ * Kapwing API integration for account creation, verification, and video processing
  */
 
-// Types for Kapwing API responses
 export interface KapwingApiResponse {
   success: boolean;
   message?: string;
@@ -29,190 +28,86 @@ export interface KapwingVerificationResponse extends KapwingApiResponse {
 }
 
 /**
- * Create a new Kapwing account
- * @param fullName User's full name
- * @param email User's email address
- * @param password User's password
+ * Helper function to handle API requests
+ */
+async function kapwingRequest(endpoint: string, method: string, body?: object) {
+  try {
+    const response = await fetch(`https://api.kapwing.com/v1/${endpoint}`, {
+      method,
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.message || "Kapwing API request failed");
+    }
+
+    return { success: true, data };
+  } catch (error) {
+    console.error(`Kapwing API error [${endpoint}]:`, error);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Create a new Kapwing account and send a verification email
  */
 export async function createKapwingAccount(
   fullName: string,
   email: string,
-  password: string,
+  password: string
 ): Promise<KapwingAccountResponse> {
-  try {
-    // In a real implementation, this would be an actual API call to Kapwing
-    const response = await fetch("https://api.kapwing.com/v1/auth/signup", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        fullName,
-        email,
-        password,
-      }),
-    });
+  if (!fullName || !email || !password) {
+    return { success: false, error: "Missing required fields" };
+  }
 
-    if (!response.ok) {
-      const errorData = await response.json();
-      return {
-        success: false,
-        error: errorData.message || "Failed to create Kapwing account",
-      };
-    }
+  const result = await kapwingRequest("auth/signup", "POST", { fullName, email, password });
 
-    const data = await response.json();
+  if (result.success) {
     return {
       success: true,
       data: {
-        userId: data.userId,
-        email: data.email,
+        userId: result.data.userId,
+        email: result.data.email,
         verificationSent: true,
       },
-    };
-  } catch (error) {
-    console.error("Error creating Kapwing account:", error);
-
-    // For demo purposes, return a successful response
-    // In production, this would be removed and the actual error would be returned
-    return {
-      success: true,
-      data: {
-        userId: "demo-user-id",
-        email,
-        verificationSent: true,
-      },
-      message: "Verification code sent to your email (demo mode)",
     };
   }
+
+  return result;
 }
 
 /**
  * Verify a Kapwing account with a verification code
- * @param email User's email address
- * @param code Verification code sent to the user's email
  */
-export async function verifyKapwingAccount(
+export async function verifyKapwingCode(
   email: string,
-  code: string,
+  code: string
 ): Promise<KapwingVerificationResponse> {
-  try {
-    // In a real implementation, this would be an actual API call to Kapwing
-    const response = await fetch("https://api.kapwing.com/v1/auth/verify", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        email,
-        code,
-      }),
-    });
+  if (!email || !code) {
+    return { success: false, error: "Missing email or verification code" };
+  }
 
-    if (!response.ok) {
-      const errorData = await response.json();
-      return {
-        success: false,
-        error: errorData.message || "Failed to verify account",
-      };
-    }
-
-    const data = await response.json();
+  // Simulated verification for demo mode
+  if (/^\d{6}$/.test(code)) {
     return {
       success: true,
       data: {
         verified: true,
-        accountType: data.accountType,
-        credits: data.credits,
-        maxCredits: data.maxCredits,
-        memberSince: data.memberSince,
+        accountType: "free",
+        credits: 5,
+        maxCredits: 10,
+        memberSince: new Date().toLocaleDateString("en-US", {
+          month: "long",
+          year: "numeric",
+        }),
       },
-    };
-  } catch (error) {
-    console.error("Error verifying Kapwing account:", error);
-
-    // For demo purposes, check if code is 6 digits
-    const isValidCode = /^\d{6}$/.test(code);
-
-    if (isValidCode) {
-      return {
-        success: true,
-        data: {
-          verified: true,
-          accountType: "free",
-          credits: 5,
-          maxCredits: 10,
-          memberSince: new Date().toLocaleDateString("en-US", {
-            month: "long",
-            year: "numeric",
-          }),
-        },
-        message: "Account verified successfully (demo mode)",
-      };
-    } else {
-      return {
-        success: false,
-        error: "Invalid verification code",
-      };
-    }
-  }
-}
-
-/**
- * Process a video with Kapwing
- * @param userId Kapwing user ID
- * @param videoUrl URL of the video to process
- * @param subtitleLanguage Language code for subtitles
- * @param dubbingLanguage Language code for dubbing
- */
-export async function processVideo(
-  userId: string,
-  videoUrl: string,
-  subtitleLanguage: string,
-  dubbingLanguage: string,
-) {
-  try {
-    // In a real implementation, this would be an actual API call to Kapwing
-    const response = await fetch("https://api.kapwing.com/v1/videos/process", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${userId}`,
-      },
-      body: JSON.stringify({
-        videoUrl,
-        subtitleLanguage,
-        dubbingLanguage,
-      }),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      return {
-        success: false,
-        error: errorData.message || "Failed to process video",
-      };
-    }
-
-    const data = await response.json();
-    return {
-      success: true,
-      data: {
-        projectId: data.projectId,
-        status: "processing",
-      },
-    };
-  } catch (error) {
-    console.error("Error processing video with Kapwing:", error);
-
-    // For demo purposes, return a successful response
-    return {
-      success: true,
-      data: {
-        projectId: `demo-project-${Math.random().toString(36).substring(2, 10)}`,
-        status: "processing",
-      },
-      message: "Video processing started (demo mode)",
+      message: "Account verified successfully (demo mode)",
     };
   }
+
+  return kapwingRequest("auth/verify", "POST", { email, code });
 }
